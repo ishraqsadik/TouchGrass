@@ -46,6 +46,14 @@ const userSchema = new mongoose.Schema(
       type: [mongoose.Schema.Types.ObjectId],
       ref: "User",
     },
+    interests: {
+      type: [String],
+      default: [],
+    },
+    attendedEvents: {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "Event",
+    },
   },
   {
     timestamps: true,

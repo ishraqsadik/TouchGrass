@@ -179,10 +179,11 @@ const sendConnectionRequest = async (req, res) => {
         receiver.requestedConnections.push(sender._id);
         await receiver.save();
 
-        res.status(200).json({ message: 'Connection request sent successfully' });
+        res.status(200).json({ success: true, message: 'Connection request sent successfully' });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ success: false, message: error.message });
     }
+
 };
 
 // Accept a connection request
@@ -193,34 +194,63 @@ const acceptConnectionRequest = async (req, res) => {
         // Check if sender exists
         const sender = await User.findOne({ username: senderUsername });
         if (!sender) {
-            return res.status(404).json({ message: 'Sender not found' });
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Sender not found' 
+            });
         }
 
         // Check if receiver exists
         const receiver = await User.findOne({ username: receiverUsername });
         if (!receiver) {
-            return res.status(404).json({ message: 'Receiver not found' });
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Receiver not found' 
+            });
         }
 
         // Check if request exists
-        if (!receiver.requestedConnections.includes(sender._id)) {
-            return res.status(400).json({ message: 'No pending connection request found' });
+        const requestExists = receiver.requestedConnections.some(
+            id => id.toString() === sender._id.toString()
+        );
+        
+        if (!requestExists) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'No pending connection request found' 
+            });
         }
 
         // Add to connections for both users
-        receiver.connections.push(sender._id);
-        sender.connections.push(receiver._id);
+        if (!receiver.connections.includes(sender._id)) {
+            receiver.connections.push(sender._id);
+        }
+        if (!sender.connections.includes(receiver._id)) {
+            sender.connections.push(receiver._id);
+        }
 
         // Remove from requested connections
         receiver.requestedConnections = receiver.requestedConnections.filter(
             id => id.toString() !== sender._id.toString()
         );
 
-        await Promise.all([receiver.save(), sender.save()]);
+        // Save both documents
+        await Promise.all([
+            receiver.save(),
+            sender.save()
+        ]);
 
-        res.status(200).json({ message: 'Connection request accepted' });
+        res.status(200).json({ 
+            success: true, 
+            message: 'Connection request accepted',
+            updatedRequests: receiver.requestedConnections 
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Error in acceptConnectionRequest:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: error.message 
+        });
     }
 };
 
@@ -253,9 +283,9 @@ const rejectConnectionRequest = async (req, res) => {
         
         await receiver.save();
 
-        res.status(200).json({ message: 'Connection request rejected' });
+        res.status(200).json({ success: true, message: 'Connection request rejected' });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
@@ -291,9 +321,38 @@ const unfriendUser = async (req, res) => {
 
         await Promise.all([sender.save(), receiver.save()]);
 
-        res.status(200).json({ message: 'Connection removed successfully' });
+        res.status(200).json({ success: true, message: 'Connection removed successfully' });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ success: false, message: error.message });
+    }
+
+};
+
+// Get connection requests for a user
+const getConnectionRequests = async (req, res) => {
+    try {
+        const { username } = req.body;
+        
+        // Find the user and populate their requested connections
+        const user = await User.findOne({ username })
+            .populate('requestedConnections', 'name username');
+        
+        // if (!user) {
+        //     return res.status(404).json({ 
+        //         success: false, 
+        //         message: 'User not found' 
+        //     });
+        // }
+
+        res.status(200).json({ 
+            success: true, 
+            requests: user.requestedConnections 
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: error.message 
+        });
     }
 };
 
@@ -305,4 +364,5 @@ module.exports = {
     sendConnectionRequest,
     acceptConnectionRequest,
     rejectConnectionRequest,
+    getConnectionRequests,
 };

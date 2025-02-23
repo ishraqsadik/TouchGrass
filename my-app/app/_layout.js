@@ -36,7 +36,7 @@ const RootLayout = () => {
     }
   }, [auth.token]);
 
-  axios.defaults.baseURL = "http://172.21.108.220:8080/api/v1";
+  axios.defaults.baseURL = "http://10.226.201.152:8080/api/v1";
 
   if (loading) {
     return (

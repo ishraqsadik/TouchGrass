@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   Text,
@@ -7,11 +7,14 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
+import axios from "axios";
+import { AuthContext } from "../../contexts/AuthContext";
 
 const ConnectionsScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [connectionRequests, setConnectionRequests] = useState([]);
+  const { auth } = useContext(AuthContext);
 
   // Example data
   const exampleUsers = [
@@ -21,17 +24,35 @@ const ConnectionsScreen = () => {
     { id: 4, name: "Alice Brown" },
   ];
 
-  const exampleRequests = [
-    { id: 1, name: "Mike Johnson" },
-    { id: 2, name: "Sarah Williams" },
-    { id: 3, name: "Tom Davis" },
-  ];
 
   // Fetch connection requests on component mount
   useEffect(() => {
-    // Simulating API call with example data
-    setConnectionRequests(exampleRequests);
-  }, []);
+    
+    if (auth.user.username) {
+      fetchConnectionRequests();
+    }
+    console.log(connectionRequests);
+  }, [auth]);
+
+
+  const fetchConnectionRequests = async () => {
+    try {
+      const username = auth?.user?.username;
+      const response = await axios.post(`/auth/user/requests`,{username});
+      
+      if (response?.data?.success) {
+        const formattedRequests = response.data.requests?.map(request => ({
+          id: request._id,
+          name: request.name,
+          username: request.username
+        })) || [];
+        setConnectionRequests(formattedRequests);
+      }
+    } catch (error) {
+      console.error("Error fetching connection requests:", error);
+      setConnectionRequests([]); // Set empty array on error
+    }
+  };
 
   // Search users when search query changes
   useEffect(() => {
@@ -68,6 +89,46 @@ const ConnectionsScreen = () => {
   };
   */
 
+  const handleAcceptRequest = async (senderUsername) => {
+    try {
+      const response = await axios.post('auth/connect/accept', {
+        senderUsername,
+        receiverUsername: auth.user.username,
+      });
+
+      if (response?.data?.success) {
+        // Immediately remove the accepted request from the local state
+        setConnectionRequests(prevRequests => 
+          prevRequests.filter(request => request.username !== senderUsername)
+        );
+        // Then fetch the updated list from server
+        await fetchConnectionRequests();
+      }
+    } catch (error) {
+      console.error("Error accepting connection request:", error);
+    }
+  };
+
+  const handleDeclineRequest = async (senderUsername) => {
+    try {
+      const response = await axios.post('/auth/connect/reject', {
+        senderUsername,
+        receiverUsername: auth.user.username,
+      });
+
+      if (response?.data?.success) {
+        // Immediately remove the declined request from the local state
+        setConnectionRequests(prevRequests => 
+          prevRequests.filter(request => request.username !== senderUsername)
+        );
+        // Then fetch the updated list from server
+        await fetchConnectionRequests();
+      }
+    } catch (error) {
+      console.error("Error rejecting connection request:", error);
+    }
+  };
+
   const renderSearchResult = ({ item }) => (
     <TouchableOpacity style={styles.userCard}>
       <Text style={styles.userName}>{item.name}</Text>
@@ -81,13 +142,31 @@ const ConnectionsScreen = () => {
     <View style={styles.requestCard}>
       <Text style={styles.userName}>{item.name}</Text>
       <View style={styles.requestButtons}>
-        <TouchableOpacity style={styles.acceptButton}>
+        <TouchableOpacity 
+          style={styles.acceptButton}
+          onPress={() => handleAcceptRequest(item.username)}
+        >
           <Text style={styles.buttonText}>Accept</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.declineButton}>
+        <TouchableOpacity 
+          style={styles.declineButton}
+          onPress={() => handleDeclineRequest(item.username)}
+        >
           <Text style={styles.buttonText}>Decline</Text>
         </TouchableOpacity>
       </View>
+    </View>
+  );
+
+  const EmptyRequestsComponent = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyText}>No connection requests found</Text>
+      <TouchableOpacity 
+        style={styles.reloadButton}
+        onPress={fetchConnectionRequests}
+      >
+        <Text style={styles.reloadButtonText}>Reload</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -116,6 +195,7 @@ const ConnectionsScreen = () => {
           renderItem={renderConnectionRequest}
           keyExtractor={(item) => item.id.toString()}
           style={styles.list}
+          ListEmptyComponent={EmptyRequestsComponent}
         />
       </View>
     </View>
@@ -214,6 +294,28 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "rgb(51, 65, 85)", // slate-700
     fontSize: 13,
+    fontWeight: "500",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: "rgb(100, 116, 139)", // slate-500
+    marginBottom: 12,
+  },
+  reloadButton: {
+    backgroundColor: "rgb(226, 232, 240)", // slate-200
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  reloadButtonText: {
+    color: "rgb(51, 65, 85)", // slate-700
+    fontSize: 14,
     fontWeight: "500",
   },
 });
