@@ -2,7 +2,7 @@ const express = require("express");
 
 const { registerController } = require("../controllers/register.controller");
 const { loginController } = require("../controllers/login.controller");
-const { registerToEvent, cancelRegistration, inviteToEvent, unfriendUser, sendConnectionRequest, acceptConnectionRequest, rejectConnectionRequest } = require("../controllers/user.controller");
+const { registerToEvent, cancelRegistration, inviteToEvent, unfriendUser, sendConnectionRequest, acceptConnectionRequest, rejectConnectionRequest, getConnectionRequests } = require("../controllers/user.controller");
 
 //router object
 const router = express.Router();
@@ -24,5 +24,7 @@ router.post('/connect/accept', acceptConnectionRequest);
 router.post('/connect/reject', rejectConnectionRequest);
 router.post('/connect/unfriend', unfriendUser);
 
+// Add this new route
+router.post('/user/requests', getConnectionRequests);
 
 module.exports = router;
